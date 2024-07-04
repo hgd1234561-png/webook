@@ -18,6 +18,6 @@ spec:
 #      Pod 里面运行的所有的 container
       containers:
         - name: webook-record
-          image: registry.cn-wulanchabu.aliyuncs.com/jiangtaibai/webook:v0.0.1
+          image: registry.cn-wulanchabu.aliyuncs.com/jiangtaibai/webook:v0.0.2
           ports:
             - containerPort: 8080
