@@ -2,31 +2,32 @@ package repository
 
 import (
 	"GkWeiBook/webook/internal/domain"
+	"GkWeiBook/webook/internal/repository/cache"
 	"GkWeiBook/webook/internal/repository/dao"
 	"context"
+	"database/sql"
 	"time"
 )
 
 var (
-	ErrUserDuplicateEmail = dao.ErrUserDuplicateEmail
-	ErrUserNotFound       = dao.ErrUserNotFound
+	ErrUserDuplicateUser = dao.ErrUserDuplicateEmail
+	ErrUserNotFound      = dao.ErrUserNotFound
 )
 
 type UserRepository struct {
-	dao *dao.UserDao
+	dao   *dao.UserDao
+	cache *cache.UserCache
 }
 
-func NewUserRepository(dao *dao.UserDao) *UserRepository {
+func NewUserRepository(dao *dao.UserDao, c *cache.UserCache) *UserRepository {
 	return &UserRepository{
-		dao: dao,
+		dao:   dao,
+		cache: c,
 	}
 }
 
 func (r *UserRepository) Create(ctx context.Context, u domain.User) error {
-	return r.dao.Insert(ctx, dao.User{
-		Email:    u.Email,
-		Password: u.Password,
-	})
+	return r.dao.Insert(ctx, r.toEntity(u))
 }
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
@@ -34,37 +35,75 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.
 	if err != nil {
 		return domain.User{}, err
 	}
-	return domain.User{
-		Id:       u.Id,
-		Email:    u.Email,
-		Password: u.Password,
-	}, nil
+	return r.toDomain(u), nil
 }
 
 func (r *UserRepository) UpdateUserById(ctx context.Context, u domain.User) error {
-	layout := "2006-01-02 15:04:05"
-	t, err := time.Parse(layout, u.Birthday)
-	if err != nil {
-		return err
-	}
 
-	return r.dao.Update(ctx, dao.User{
-		Id:       u.Id,
-		Nickname: u.Nickname,
-		Birthday: t.Unix(),
-		AboutMe:  u.AboutMe,
-	})
+	return r.dao.Update(ctx, r.toEntity(u))
 }
 
 func (r *UserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
-	u, err := r.dao.FindById(ctx, id)
+	u, err := r.cache.Get(ctx, id)
+	if err == nil {
+		// 必然有数据
+		return u, nil
+	}
+	//// 没有数据
+	//if err == cache.ErrKeyNotExist {
+	//	// 去数据库加载
+	//}
+	// err 不为 nil，就要查询数据库
+	// err 有两种可能
+	// 1. key 不存在，说明 redis 是正常的
+	// 2. 访问 redis 有问题。可能是网络有问题，也可能是 redis 本身就崩溃了
+	ue, err := r.dao.FindById(ctx, id)
 	if err != nil {
 		return domain.User{}, err
 	}
+	u = r.toDomain(ue)
+
+	err = r.cache.Set(ctx, u)
+	if err != nil {
+		//打日志做监控
+	}
+	return u, err
+}
+
+func (r *UserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
+	u, err := r.dao.FindByPhone(ctx, phone)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return r.toDomain(u), nil
+}
+
+func (r *UserRepository) toDomain(u dao.User) domain.User {
 	return domain.User{
-		Email:    u.Email,
-		Nickname: u.Nickname,
-		Birthday: time.Unix(u.Birthday, 0).Format("2006-01-02"),
+		Id:       u.Id,
+		Email:    u.Email.String,
+		Phone:    u.Phone.String,
+		Password: u.Password,
 		AboutMe:  u.AboutMe,
-	}, nil
+		Nickname: u.Nickname,
+		Birthday: time.UnixMilli(u.Birthday),
+	}
+}
+
+func (r *UserRepository) toEntity(u domain.User) dao.User {
+	return dao.User{
+		Id: u.Id,
+		Email: sql.NullString{
+			String: u.Email,
+			Valid:  u.Email != "",
+		},
+		Phone: sql.NullString{
+			String: u.Phone,
+			Valid:  u.Phone != "",
+		},
+		Password: u.Password,
+		Birthday: u.Birthday.UnixMilli(),
+		AboutMe:  u.AboutMe,
+		Nickname: u.Nickname,
+	}
 }
