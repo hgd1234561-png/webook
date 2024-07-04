@@ -6,33 +6,33 @@ import LoginForm from '../pages/users/login';
 import { BrowserRouter, Route, Routes } from "react-router-dom"
 import {Row} from "antd";
 
-// @ts-ignore
 const Signup = () => (
     <div>
-        <Row type="flex" justify="center" align={"middle"}>
-            <SignupForm></SignupForm>
+        <Row justify="center" align="middle" style={{ display: 'flex' }}>
+            <SignupForm />
         </Row>
     </div>
 );
+
 
 const Login = () => (
     <div>
-        <Row type="flex" justify="center" align={"middle"}>
-            <LoginForm></LoginForm>
+        <Row justify="center" align="middle" style={{ display: 'flex' }}>
+            <LoginForm />
         </Row>
     </div>
 );
 
-
-
 const App = () => {
-    return <BrowserRouter>
-        <Routes>
-            <Route index element={<Signup />} />
-            <Route path="signup" element={<Signup />} />
-            <Route path="login" element={<Login />} />
-        </Routes>
-    </BrowserRouter>
+    return (
+        <BrowserRouter>
+            <Routes>
+                <Route index element={<Signup />} />
+                <Route path="signup" element={<Signup />} />
+                <Route path="login" element={<Login />} />
+            </Routes>
+        </BrowserRouter>
+    );
 }
 
 export default App;
