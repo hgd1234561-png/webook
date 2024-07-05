@@ -11,13 +11,17 @@ import (
 
 var ErrKeyNotExist = redis.Nil
 
-type UserCache struct {
+type UserCache interface {
+	Get(ctx context.Context, uid int64) (domain.User, error)
+	Set(ctx context.Context, du domain.User) error
+}
+type RedisUserCache struct {
 	client     redis.Cmdable
 	expiration time.Duration
 }
 
-func NewUserCache(client redis.Cmdable) *UserCache {
-	return &UserCache{
+func NewUserCache(client redis.Cmdable) UserCache {
+	return &RedisUserCache{
 		client:     client,
 		expiration: time.Minute * 30,
 	}
@@ -25,7 +29,7 @@ func NewUserCache(client redis.Cmdable) *UserCache {
 
 // error为nil 默认为有数据
 // 如果没有数据 返回一个特点的error
-func (cache *UserCache) Get(ctx context.Context, uid int64) (domain.User, error) {
+func (cache *RedisUserCache) Get(ctx context.Context, uid int64) (domain.User, error) {
 	key := cache.key(uid)
 	// 我假定这个地方用 JSON 来
 	data, err := cache.client.Get(ctx, key).Result()
@@ -41,7 +45,7 @@ func (cache *UserCache) Get(ctx context.Context, uid int64) (domain.User, error)
 	return u, err
 }
 
-func (cache *UserCache) Set(ctx context.Context, du domain.User) error {
+func (cache *RedisUserCache) Set(ctx context.Context, du domain.User) error {
 	key := cache.key(du.Id)
 	// 我假定这个地方用 JSON
 	data, err := json.Marshal(du)
@@ -51,7 +55,7 @@ func (cache *UserCache) Set(ctx context.Context, du domain.User) error {
 	return cache.client.Set(ctx, key, data, cache.expiration).Err()
 }
 
-func (cache *UserCache) key(uid int64) string {
+func (cache *RedisUserCache) key(uid int64) string {
 	// user-info-
 	// user.info.
 	// user/info/
