@@ -3,6 +3,7 @@ module GkWeiBook
 go 1.20
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.775
 	github.com/dlclark/regexp2 v1.11.0
 	github.com/ecodeclub/ekit v0.0.9
@@ -16,6 +17,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.950
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms v1.0.950
+	go.uber.org/mock v0.4.0
 	golang.org/x/crypto v0.23.0
 	gorm.io/driver/mysql v1.5.6
 	gorm.io/gorm v1.25.10
