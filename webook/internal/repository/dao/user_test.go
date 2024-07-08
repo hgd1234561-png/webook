@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/DATA-DOG/go-sqlmock"
 	mysqlDriver "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
@@ -85,6 +86,7 @@ func TestGORMUserDAO_Insert(t *testing.T) {
 			dao := NewUserDao(db)
 			err = dao.Insert(tc.ctx, tc.user)
 			assert.Equal(t, tc.wantErr, err)
+			fmt.Println(tc.wantErr)
 		})
 	}
 }
