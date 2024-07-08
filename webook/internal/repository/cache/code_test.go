@@ -33,12 +33,10 @@ func TestRedisCodeCache_Set(t *testing.T) {
 			name: "设置成功",
 			mock: func(ctrl *gomock.Controller) redis.Cmdable {
 				res := redismocks.NewMockCmdable(ctrl)
-				cmd := redis.NewCmd(context.Background())
-				cmd.SetErr(nil)
-				cmd.SetVal(int64(0))
+				cmd := redis.NewCmdResult(int64(0), nil)
 				res.EXPECT().Eval(gomock.Any(), luaSetCode,
 					[]string{keyFunc("test", "15212345678")},
-					[]any{"123456"}).Return(cmd)
+					"123456").Return(cmd)
 				return res
 			},
 			biz:     "test",
@@ -79,7 +77,7 @@ func TestRedisCodeCache_Set(t *testing.T) {
 			biz:     "test",
 			phone:   "15212345678",
 			code:    "123456",
-			wantErr: errors.New("验证码存在，但是没有过期时间"),
+			wantErr: errors.New("系统错误"),
 		},
 		{
 			name: "发送太频繁",
@@ -106,7 +104,7 @@ func TestRedisCodeCache_Set(t *testing.T) {
 			defer ctrl.Finish()
 			client := tt.mock(ctrl)
 			re := NewCodeCache(client)
-			err := re.Set(context.Background(), "biz", "phone", "code")
+			err := re.Set(context.Background(), tt.biz, tt.phone, tt.code)
 			assert.Equal(t, tt.wantErr, err)
 		})
 	}
