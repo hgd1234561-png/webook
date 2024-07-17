@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.775
+	github.com/allegro/bigcache/v3 v3.1.0
 	github.com/dlclark/regexp2 v1.11.0
 	github.com/ecodeclub/ekit v0.0.9
 	github.com/gin-contrib/cors v1.7.2
