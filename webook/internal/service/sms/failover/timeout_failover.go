@@ -21,9 +21,10 @@ type TimeoutFailoverSMSService struct {
 	threshold uint64
 }
 
-func NewTimeoutFailoverSMSService(svcs []sms.Service) sms.Service {
+func NewTimeoutFailoverSMSService(svcs []sms.Service, threshold uint64) sms.Service {
 	return &TimeoutFailoverSMSService{
-		svcs: svcs,
+		svcs:      svcs,
+		threshold: threshold,
 	}
 }
 
