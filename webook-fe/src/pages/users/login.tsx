@@ -12,7 +12,7 @@ const onFinish = (values: any) => {
                 return
             }
             alert(res.data)
-            router.push('/users/profile')
+            router.push('/articles/list')
         }).catch((err) => {
             alert(err);
     })
@@ -22,8 +22,8 @@ const onFinishFailed = (errorInfo: any) => {
     alert("输入有误")
 };
 
-const LoginForm: React.FC = () => (
-    <Form
+const LoginForm: React.FC = () => {
+    return (<Form
         name="basic"
         labelCol={{ span: 8 }}
         wrapperCol={{ span: 16 }}
@@ -53,11 +53,17 @@ const LoginForm: React.FC = () => (
             <Button type="primary" htmlType="submit">
                 登录
             </Button>
+            <Link href={"/users/login_sms"} >
+                &nbsp;&nbsp;手机号登录
+            </Link>
+            <Link href={"/users/login_wechat"} >
+                &nbsp;&nbsp;微信扫码登录
+            </Link>
             <Link href={"/users/signup"} >
-                &nbsp;注册
+                &nbsp;&nbsp;注册
             </Link>
         </Form.Item>
     </Form>
-);
+)};
 
 export default LoginForm;
