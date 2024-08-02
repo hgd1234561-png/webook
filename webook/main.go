@@ -2,11 +2,18 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+	_ "github.com/spf13/viper/remote"
+	"go.uber.org/zap"
 )
 
 // 前端node版本是18.16.0
 func main() {
 
+	//initViper()
+
+	initViperRemote()
 	r := InitWebServer()
 	r.GET("/hello", func(ctx *gin.Context) {
 		ctx.String(200, "Hello, K8S!")
@@ -90,3 +97,54 @@ func main() {
 //	}
 //	return db
 //}
+
+func initViper() {
+	cfile := pflag.String("dev",
+		"webook/config/dev.yaml", "配置文件路径")
+	// 这一步之后，cfile 里面才有值
+	pflag.Parse()
+	//viper.Set("db.dsn", "localhost:3306")
+	// 所有的默认值放好s
+	viper.SetConfigType("yaml")
+	viper.SetConfigFile(*cfile)
+	// 读取配置
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func initViperRemote() {
+	err := viper.AddRemoteProvider("etcd3",
+		"http://8.130.82.184:2379", "/webook")
+	if err != nil {
+		panic(err)
+	}
+	viper.SetConfigName("dev")
+	viper.SetConfigType("yaml")
+	//viper.OnConfigChange(func(in fsnotify.Event) {
+	//	log.Println("远程配置中心发生变更")
+	//})
+	//go func() {
+	//	for {
+	//		err = viper.WatchRemoteConfig()
+	//		if err != nil {
+	//			panic(err)
+	//		}
+	//		log.Println("watch", viper.GetString("test.key"))
+	//		//time.Sleep(time.Second)
+	//	}
+	//}()
+	err = viper.ReadRemoteConfig()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func initLogger() {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	zap.ReplaceGlobals(logger)
+}
