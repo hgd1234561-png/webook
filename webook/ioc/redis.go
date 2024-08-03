@@ -1,9 +1,18 @@
 package ioc
 
-import "github.com/redis/go-redis/v9"
+import (
+	"GkWeiBook/webook/pkg/ratelimit"
+	"github.com/redis/go-redis/v9"
+	"github.com/spf13/viper"
+	"time"
+)
 
 func InitRedis() redis.Cmdable {
 	return redis.NewClient(&redis.Options{
-		Addr: "101.126.22.227:30399",
+		Addr: viper.GetString("redis.addr"),
 	})
+}
+
+func InitLimiter(cmd redis.Cmdable) ratelimit.Limiter {
+	return ratelimit.NewRedisSlidingWindowLimiter(cmd, time.Second, 1000)
 }

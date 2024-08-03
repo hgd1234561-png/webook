@@ -2,12 +2,22 @@ package ioc
 
 import (
 	"GkWeiBook/webook/internal/repository/dao"
+	"fmt"
+	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 func InitDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("root:root@tcp(101.126.22.227:31823)/webook"))
+	type config struct {
+		DSN string `yaml:"dsn"`
+	}
+	var c config
+	err := viper.UnmarshalKey("db", &c)
+	if err != nil {
+		panic(fmt.Sprintf("配置文件解析失败: %v", err))
+	}
+	db, err := gorm.Open(mysql.Open(c.DSN))
 	if err != nil {
 		panic(err)
 	}
