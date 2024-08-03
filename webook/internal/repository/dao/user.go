@@ -20,6 +20,7 @@ type UserDAO interface {
 	Update(ctx context.Context, u User) error
 	FindById(ctx context.Context, id int64) (User, error)
 	FindByPhone(ctx context.Context, phone string) (User, error)
+	FindByWechat(ctx context.Context, openId string) (User, error)
 }
 
 type GORMUserDAO struct {
@@ -79,6 +80,12 @@ func (dao *GORMUserDAO) FindByPhone(ctx context.Context, phone string) (User, er
 	return u, err
 }
 
+func (dao *GORMUserDAO) FindByWechat(ctx context.Context, openId string) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("wechat_open_id=?", openId).First(&u).Error
+	return u, err
+}
+
 // User 直接对应数据库的表结构
 type User struct {
 	Id       int64          `gorm:"primaryKey,autoIncrement"`
@@ -92,6 +99,9 @@ type User struct {
 
 	// 代表这是一个可以为 NULL 的列
 	Phone sql.NullString `gorm:"unique"`
+
+	WechatOpenId  sql.NullString `gorm:"unique"`
+	WechatUnionId sql.NullString
 
 	// 创建时间  毫秒数
 	Ctime int64
