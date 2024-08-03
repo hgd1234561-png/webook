@@ -3,23 +3,27 @@ package web
 import (
 	"GkWeiBook/webook/internal/domain"
 	"GkWeiBook/webook/internal/service"
+	ijwt "GkWeiBook/webook/internal/web/jwt"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 	"net/http"
 	"time"
 )
 
 type UserHandler struct {
+	ijwt.Handler
 	svc         service.UserService
 	codeSvc     service.CodeService
+	cmd         redis.Cmdable
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
 	timeExp     *regexp.Regexp
 }
 
-func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
+func NewUserHandler(svc service.UserService, codeSvc service.CodeService, jwtHdl ijwt.Handler) *UserHandler {
 	// 正则表达式
 	const (
 		emailRegexPattern = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
@@ -38,6 +42,7 @@ func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserH
 		emailExp:    emailExp,
 		passwordExp: passwordExp,
 		timeExp:     timeExp,
+		Handler:     jwtHdl,
 	}
 }
 
@@ -46,10 +51,54 @@ func (u *UserHandler) RegisterRouters(r *gin.Engine) {
 	up.POST("/signup", u.SignUp)
 	//up.POST("/login", u.Login)
 	up.POST("/login", u.LoginJWT)
+	up.POST("/logout", u.Logout)
 	up.POST("/edit", u.Edit)
 	up.GET("/profile", u.Profile)
 	up.POST("/login_sms/code/send", u.SendLoginSMSCode)
 	up.POST("/login_sms", u.LoginSMS)
+	up.POST("/refresh_token", u.RefreshToken)
+}
+
+func (u *UserHandler) Logout(ctx *gin.Context) {
+	err := u.ClearToken(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "退出登陆失败",
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Code: 5,
+		Msg:  "退出登陆成功",
+	})
+
+}
+
+func (u *UserHandler) RefreshToken(ctx *gin.Context) {
+	// 只有这个接口，拿出来的才是refresh_token, 其他地方都是access_token
+	refreshToken := u.ExtractToken(ctx)
+	var rc ijwt.RefreshClaims
+	token, err := jwt.ParseWithClaims(refreshToken, &rc, func(token *jwt.Token) (interface{}, error) {
+		return ijwt.RtKey, nil
+	})
+	if err != nil || !token.Valid {
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	err = u.CheckSession(ctx, rc.Ssid)
+	if err != nil {
+		// redis有问题， 或者退出登录了
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	//搞一个新的access_token
+	err = u.SetJWTToken(ctx, rc.Uid, rc.Ssid)
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	ctx.String(http.StatusOK, "ok")
 }
 
 func (u *UserHandler) LoginSMS(ctx *gin.Context) {
@@ -87,7 +136,12 @@ func (u *UserHandler) LoginSMS(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-	u.setJWTToken(ctx, uc.Id)
+
+	if err := u.SetLoginToken(ctx, uc.Id); err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
 	ctx.String(http.StatusOK, "登录成功")
 }
 
@@ -209,31 +263,13 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 
 	// 用JWT设置登录态
 	// 生成JWT token
-	if err = u.setJWTToken(ctx, user.Id); err != nil {
+	if err = u.SetLoginToken(ctx, user.Id); err != nil {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
 
 	ctx.String(http.StatusOK, "登录成功")
 	return
-}
-
-func (u *UserHandler) setJWTToken(ctx *gin.Context, uid int64) error {
-	uc := UserClaims{
-		Uid: uid,
-		RegisteredClaims: jwt.RegisteredClaims{
-			// 1 分钟过期
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
-		},
-		UserAgent: ctx.Request.UserAgent(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
-	tokenStr, err := token.SignedString([]byte("bstmmTdM2KFxXcm544kMZzzBsBgwgb6J"))
-	if err != nil {
-		return err
-	}
-	ctx.Header("x-jwt-token", tokenStr)
-	return nil
 }
 
 func (u *UserHandler) Login(ctx *gin.Context) {
@@ -289,7 +325,7 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-	uc, ok := ctx.MustGet("user").(UserClaims)
+	uc, ok := ctx.MustGet("user").(ijwt.UserClaims)
 
 	if !ok {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
@@ -319,7 +355,7 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 
 func (u *UserHandler) Profile(ctx *gin.Context) {
 	//uc, ok := ctx.Get("user")
-	uc, ok := ctx.MustGet("user").(UserClaims)
+	uc, ok := ctx.MustGet("user").(ijwt.UserClaims)
 	if !ok {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
@@ -343,10 +379,4 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 		AboutMe:  user.AboutMe,
 		Birthday: user.Birthday.Format(time.DateOnly),
 	})
-}
-
-type UserClaims struct {
-	jwt.RegisteredClaims
-	Uid       int64
-	UserAgent string
 }
