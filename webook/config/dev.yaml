@@ -1,0 +1,5 @@
+redis:
+  addr: "101.126.22.227:30399"
+
+db:
+  dsn: "root:root@tcp(101.126.22.227:31823)/webook"
