@@ -7,3 +7,7 @@ import "context"
 type Service interface {
 	Send(ctx context.Context, tpl string, args map[string]string, numbers ...string) error
 }
+
+type TencentService interface {
+	Send(ctx context.Context, tpl string, args []string, numbers ...string) error
+}
